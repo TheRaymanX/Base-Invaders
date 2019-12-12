@@ -1,7 +1,7 @@
 body
 {
     font-family:'segoe ui bold';
-    background-image:url("../bg.jpg");
+    background-image:url("../images/bg.jpg");
     background-size:cover;
     background-repeat: no-repeat;
 }
