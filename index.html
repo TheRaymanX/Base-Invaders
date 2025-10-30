@@ -1,70 +1,148 @@
-<html>
-
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <!----
-  TITLE
-  ------>
-  <link rel="icon" href="images/chicken.png" type="image/png" size="16x16">
-  <title>ChickenInvaders</title>
-  <!----
-  END TITLE
-  ------>
-  <!----
-  CSS FILES
-  ------>
-  <link rel="stylesheet" href="css/bootstrap.min.css">
-  <link rel="stylesheet" href="css/all.min.css">
-  <link rel="stylesheet" href="css/index_style.css">
- <!----
-  END CSS FILES
-  ------>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Base Invaders</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    body { background: linear-gradient(#001122, #0052FF); overflow: hidden; font-family: Arial; }
+    canvas { display: block; margin: 0 auto; touch-action: none; image-rendering: pixelated; }
+    #ui { position: absolute; top: 10px; left: 10px; right: 10px; color: #00D1FF; font: bold 20px Arial; display: flex; justify-content: space-between; }
+    #gameover { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font: bold 28px Arial; text-align: center; display: none; background: rgba(0,0,0,0.8); padding: 40px; border-radius: 20px; }
+    button { margin: 10px; padding: 15px 30px; font-size: 18px; background: #0052FF; color: white; border: none; border-radius: 10px; cursor: pointer; }
+  </style>
 </head>
-<body id="bodyWindow">
-  <!----
-  SCORE SECTION
-  ---->
-  <div id="scorePart">
-    Score:
-    <span id="score">0</span></div>
+<body>
+  <div id="ui">
+    <span id="score">Score: 0</span>
+    <span id="lives">❤️❤️❤️</span>
+    <span id="wave">Wave: 1</span>
   </div>
-   <!----
-   END SCORE SECTION
-   ---->
-   <!----
-   CHICKEN SECTION
-   ---->
-  <div id="chicken" class="chicken w-100">
-    <div id="chicken1" class="w-100 d-flex justify-content-around"></div>
-    <div id="chicken2" class="w-100 d-flex justify-content-around"></div>
+  <canvas id="game" width="390" height="600"></canvas>
+  <div id="gameover">
+    <div id="finalScore" style="font-size: 36px; margin: 20px 0;"></div>
+    <button id="playAgain">Play Again</button>
+    <button id="submitScore">Mint Badge & Share</button>
   </div>
-   <!----
-    END CHICKEN SECTION
-    ---->
-   <!----
-   WEAPON SECTION
-   ---->
-  <div class="weapon"> 
-    <div class="rocket text-center">
-      <img src="images/hero.png">
-    </div>
-    <div class="bullet text-center">
-      <img src="images/bullet.png">
-      <audio id="bulletSound">
-        <source src="images/preview.mp3">
-      </audio>
-    </div>
-    <!----
-    END WEAPON SECTION
-    ---->
-  </div>
-<!----
-JS FILES
------->
-<script src="js/jquery-3.4.1.min.js"></script>
-<script src="js/app.js"></script>
-<!----
-END JS FILES
------->
-</body>
 
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 390; canvas.height = 600;
+
+    let shipX = 195, score = 0, lives = 3, wave = 1, gameActive = true;
+    let enemies = [], bullets = [], eggs = [], particles = [], stars = [];
+    let enemyDir = 1, enemySpeed = 0.5, shootDelay = 300, lastShot = 0;
+
+    for(let i=0; i<100; i++) stars.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, speed: Math.random()*2+1});
+
+    ['touchstart','touchmove','touchend','mousedown','mousemove','mouseup'].forEach(ev => {
+      canvas.addEventListener(ev, e => {
+        e.preventDefault();
+        if (ev.includes('touch')) { 
+          if (ev !== 'touchend') shipX = Math.max(30, Math.min(360, e.touches[0].clientX - canvas.getBoundingClientRect().left));
+        } else { 
+          if (ev !== 'mouseup') shipX = Math.max(30, Math.min(360, e.clientX - canvas.getBoundingClientRect().left));
+        }
+      });
+    });
+
+    function spawnWave() {
+      enemies = [];
+      for(let row=0; row<5; row++) for(let col=0; col<8; col++)
+        enemies.push({x: 50 + col*40, y: 50 + row*45, w:28, h:28, alive:true});
+      wave++;
+      enemySpeed += 0.2;
+    }
+
+    function shoot() {
+      const now = Date.now();
+      if (now - lastShot > shootDelay && gameActive) {
+        bullets.push({x: shipX, y: 550, vy: -12});
+        lastShot = now;
+      }
+    }
+
+    function update() {
+      if (!gameActive) return;
+
+      stars.forEach(s => { s.y += s.speed; if (s.y > canvas.height) s.y = 0; });
+
+      shoot();
+
+      bullets = bullets.filter(b => { b.y += b.vy; return b.y > -20; });
+      ctx.fillStyle = '#00FFAA'; bullets.forEach(b => ctx.fillRect(b.x-2, b.y, 4, 15));
+
+      let edgeHit = false;
+      enemies.forEach(e => {
+        if (e.alive) {
+          e.x += enemyDir * enemySpeed;
+          if (e.x < 10 || e.x > canvas.width - 40) edgeHit = true;
+          if (Math.random() < 0.005) eggs.push({x: e.x+14, y: e.y+28, vy: 3});
+          ctx.fillStyle = '#FF0066'; ctx.fillRect(e.x, e.y, e.w, e.h);
+          ctx.fillStyle = '#FFF'; ctx.fillRect(e.x+8, e.y+4, 12, 8);
+        }
+      });
+      if (edgeHit) { enemyDir *= -1; enemies.forEach(e => e.y += 20); }
+
+      eggs = eggs.filter(egg => {
+        egg.y += egg.vy;
+        ctx.fillStyle = '#FFFF00'; ctx.beginPath(); ctx.arc(egg.x, egg.y, 6, 0, Math.PI*2); ctx.fill();
+        if (egg.y > 580) { lives--; return false; }
+        return true;
+      });
+
+      bullets.forEach((b,i) => enemies.forEach((e,j) => {
+        if (e.alive && Math.hypot(b.x - e.x-14, b.y - e.y-14) < 20) {
+          e.alive = false; bullets.splice(i,1); score += 100 * wave;
+          for(let k=0; k<10; k++) particles.push({x: e.x+14, y: e.y+14, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life:30});
+        }
+      }));
+
+      particles = particles.filter(p => {
+        p.x += p.vx; p.y += p.vy; p.life--;
+        ctx.fillStyle = `rgba(255,255,0,${p.life/30})`; ctx.fillRect(p.x, p.y, 4,4);
+        return p.life > 0;
+      });
+
+      if (enemies.every(e => !e.alive)) spawnWave();
+
+      ctx.fillStyle = '#0052FF'; ctx.fillRect(shipX-20, 540, 40, 40);
+      ctx.fillStyle = '#00D1FF'; ctx.beginPath(); ctx.moveTo(shipX, 520); ctx.lineTo(shipX-15, 550); ctx.lineTo(shipX+15,550); ctx.fill();
+
+      document.getElementById('score').textContent = `Score: ${score}`;
+      document.getElementById('lives').textContent = '❤️'.repeat(lives);
+      document.getElementById('wave').textContent = `Wave: ${wave}`;
+
+      if (lives <= 0) endGame();
+    }
+
+    function endGame() {
+      gameActive = false;
+      document.getElementById('finalScore').textContent = `Final: ${score}`;
+      document.getElementById('gameover').style.display = 'block';
+    }
+
+    function shareOnWarpcast() {
+      const text = `I scored ${score} on Base Invaders! Can you beat me? Play now!`;
+      window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(text + '\n\n')}&embeds[]=${encodeURIComponent(window.location.href)}`, '_blank');
+    }
+
+    document.getElementById('playAgain').onclick = () => location.reload();
+    document.getElementById('submitScore').onclick = () => {
+      alert("You got a badge! Shared on Warpcast!");
+      shareOnWarpcast();
+    };
+
+    spawnWave();
+    function loop() { 
+      ctx.fillStyle = '#001122'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      stars.forEach(s => { ctx.fillStyle='#FFF'; ctx.fillRect(s.x, s.y, 2,2); });
+      update(); 
+      requestAnimationFrame(loop); 
+    }
+    loop();
+  </script>
+</body>
 </html>
